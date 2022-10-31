@@ -1,24 +1,30 @@
 #[macro_use]
 extern crate log;
 extern crate chrono;
-use chrono::offset::Utc;
-use chrono::DateTime;
-use std::{time::SystemTime};
+// use chrono::offset::Utc;
+// use chrono::DateTime;
+// use std::{time::SystemTime};
 use quiche::h3::NameValue;
 use ring::rand::*;
-use std::fs::OpenOptions;
-use std::io::Write;
+// use std::fs::OpenOptions;
+// use std::io::Write;
+use opentelemetry::{global, trace::Tracer};
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
 
 fn main() {
-    let mut file = OpenOptions::new().write(true).read(true).append(true).create(true).open("time.txt").unwrap();
+    // let mut file = OpenOptions::new().write(true).read(true).append(true).create(true).open("time.txt").unwrap();
 
-    let start = SystemTime::now();
-    let datetime: DateTime<Utc> = start.into();
-    let content = String::from("HTTP3 page visit start time is: ");
-    file.write_all(content.as_bytes()).unwrap();
-    file.write_all(datetime.format("%m/%d/%Y %T%.3f\n").to_string().as_bytes()).unwrap();
+    // let start = SystemTime::now();
+    // let datetime: DateTime<Utc> = start.into();
+    // let content = String::from("HTTP3 page visit start time is: ");
+    // file.write_all(content.as_bytes()).unwrap();
+    // file.write_all(datetime.format("%m/%d/%Y %T%.3f\n").to_string().as_bytes()).unwrap();
+
+    global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
+    let tracer = opentelemetry_jaeger::new_agent_pipeline().with_service_name("quic_client").install_simple().unwrap();
+
+    tracer.in_span("quic_webpage_fetch", |cx| {
 
     let mut buf = [0; 65535];
     let mut out = [0; MAX_DATAGRAM_SIZE];
@@ -323,11 +329,14 @@ fn main() {
             break;
         }
     }
-    let end = SystemTime::now();
-    let datetime: DateTime<Utc> = end.into();
-    let content = String::from("HTTP3 page visit end time is: ");
-    file.write_all(content.as_bytes()).unwrap();
-    file.write_all(datetime.format("%m/%d/%Y %T%.3f\n").to_string().as_bytes()).unwrap();
+
+});
+global::shutdown_tracer_provider();
+    // let end = SystemTime::now();
+    // let datetime: DateTime<Utc> = end.into();
+    // let content = String::from("HTTP3 page visit end time is: ");
+    // file.write_all(content.as_bytes()).unwrap();
+    // file.write_all(datetime.format("%m/%d/%Y %T%.3f\n").to_string().as_bytes()).unwrap();
 }
 
 fn hex_dump(buf: &[u8]) -> String {
